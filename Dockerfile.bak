@@ -1,0 +1,61 @@
+# Temporarily pulling from docker hub.
+# Once we have access to their repo, we will build from their source.
+#FROM dfinity/rosetta-api@sha256:026b6d9de19e193e9adf4b04794fa602b578c027d1e2e4b3569148c410658a90
+FROM rust:1.55.0-bullseye as builder
+
+ARG RELEASE=master
+
+WORKDIR /var/tmp
+
+ADD \
+  https://github.com/dfinity/ic/archive/${RELEASE}.tar.gz \
+  ic.tar.gz
+
+RUN \
+  tar -xf ic.tar.gz --strip-components=1 && \
+  cd rs/rosetta-api && \
+  cargo build --release --bin ic-rosetta-api
+
+FROM debian:bullseye-slim
+
+# environment variable to display a backtrace
+ENV RUST_BACKTRACE=1
+
+WORKDIR /root
+
+COPY --from=builder \
+  #/var/tmp/rs/rosetta-api/bin/ic-rosetta-api \
+  /var/tmp/target/release/ic-rosetta-api \
+  /usr/local/bin/
+
+COPY --from=builder \
+  /var/tmp/rs/rosetta-api/log_config.yml \
+  /root/
+
+RUN \
+  apt update && \
+  apt install -y \
+    ca-certificates \
+    libsqlite3-0 && \
+  apt autoremove --purge -y && \
+  rm -rf \
+    /tmp/* \
+    /var/lib/apt/lists/* \
+    /var/tmp/*
+
+### Node Service ###
+RUN mkdir -p /app \
+  && chown -R nobody:nogroup /app \
+  && mkdir -p /data \
+  && chown -R nobody:nogroup /data
+
+# Copy config files
+COPY scripts /app/assets
+
+# Allow agent to see version number
+ARG VERSION=1.8.0
+RUN echo -n "${VERSION}" > /app/assets/VERSION
+
+# FIXME: this CMD once we build from source
+# CMD ["/app/assets/entrypoint.sh"]
+ENTRYPOINT ["/app/assets/entrypoint.sh"]
