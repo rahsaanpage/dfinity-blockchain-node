@@ -70,3 +70,7 @@ docker run -e NODE_ENTRYPOINT="ic-rosetta-api" \
 ## Version
 
 Current version: 1.8.0
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
